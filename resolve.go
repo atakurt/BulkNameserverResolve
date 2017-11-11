@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ var dnsFile string
 var workerCount int
 var retryCount int
 var nameserver string
+var nameserverPort int
 var outputType string
 var timeout time.Duration
 
@@ -81,7 +83,8 @@ func logIt(v ...interface{}) {
 func resolve(wg *sync.WaitGroup, id int, dnsQueue <-chan string, dnsResults chan<- resolveResult) {
 	defer wg.Done()
 	for domain := range dnsQueue {
-		logIt("worker", id, "resolving", domain)
+		nameServer := nameserver + ":" + strconv.Itoa((nameserverPort))
+		logIt("worker", id, "resolving", domain, "from", nameServer)
 
 		var result []string
 		var err error
@@ -89,8 +92,8 @@ func resolve(wg *sync.WaitGroup, id int, dnsQueue <-chan string, dnsResults chan
 		var timeout = false
 		var status string
 		for i := retryCount; i > 0; i-- {
-			result, t, status, err = resolveNS(domain)
-			timeout = isTimeout(err)
+			result, t, status, err = resolveNS(domain, nameServer)
+			timeout = status == "TIMEOUT"
 			if nil == err || !timeout {
 				break
 			}
@@ -113,12 +116,12 @@ func isTimeout(err error) bool {
 	return nil != err && strings.HasSuffix(err.Error(), "i/o timeout")
 }
 
-func resolveNS(domain string) (r []string, t time.Duration, status string, err error) {
+func resolveNS(domain string, nameServer string) (r []string, t time.Duration, status string, err error) {
 	c := dns.Client{}
 	c.Timeout = timeout
 	m := dns.Msg{}
 	m.SetQuestion(domain+".", dns.TypeNS)
-	response, t, err := c.Exchange(&m, nameserver+":53")
+	response, t, err := c.Exchange(&m, nameServer)
 
 	status = "SUCCESS"
 	if err != nil {
@@ -185,6 +188,7 @@ func parseArgs() {
 	timeoutPtr := flag.Duration("t", 10*time.Second, "timeout duration")
 	inputPtr := flag.String("i", "", "domain list")
 	nameserverPtr := flag.String("ns", "8.8.8.8", "nameserver")
+	nameserverPortPtr := flag.Int("nsp", 53, "nameserver port")
 	outPtr := flag.String("o", "tsv", "output type: tsv,struct")
 
 	flag.Parse()
@@ -195,6 +199,7 @@ func parseArgs() {
 	nameserver = *nameserverPtr
 	outputType = *outPtr
 	timeout = *timeoutPtr
+	nameserverPort = *nameserverPortPtr
 
 	if "" == *inputPtr {
 		flag.Usage()
