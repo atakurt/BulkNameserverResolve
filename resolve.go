@@ -60,9 +60,12 @@ func printDNSResult(result resolveResult) {
 		fmt.Println(result)
 	} else {
 		var nameservers string
-		if len(result.nameservers) == 0 {
+		switch len(result.nameservers) {
+		case 0:
 			nameservers = "\t\t"
-		} else {
+		case 1:
+			nameservers = result.nameservers[0] + "\t"
+		default:
 			nameservers = strings.Join(result.nameservers[0:2], "\t")
 		}
 		fmt.Println(result.domain, "\t", nameservers, result.status)
