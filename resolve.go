@@ -115,7 +115,7 @@ func isTimeout(err error) bool {
 
 func resolveNS(domain string) (r []string, t time.Duration, status string, err error) {
 	c := dns.Client{}
-	c.Timeout = timeout * time.Second
+	c.Timeout = timeout
 	m := dns.Msg{}
 	m.SetQuestion(domain+".", dns.TypeNS)
 	response, t, err := c.Exchange(&m, nameserver+":53")
@@ -182,7 +182,7 @@ func parseArgs() {
 	verbosePtr := flag.Bool("v", false, "verbose")
 	workerPtr := flag.Int("w", runtime.NumCPU(), "worker count")
 	retryPtr := flag.Int("r", 5, "retry count")
-	timeoutPtr := flag.Duration("t", 10, "timeout duration in seconds")
+	timeoutPtr := flag.Duration("t", 10*time.Second, "timeout duration")
 	inputPtr := flag.String("i", "", "domain list")
 	nameserverPtr := flag.String("ns", "8.8.8.8", "nameserver")
 	outPtr := flag.String("o", "tsv", "output type: tsv,struct")
