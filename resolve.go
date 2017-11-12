@@ -90,11 +90,13 @@ func resolve(wg *sync.WaitGroup, id int, dnsQueue <-chan string, dnsResults chan
 		var err error
 		var t time.Duration
 		var timeout = false
+		var retry = false
 		var status string
 		for i := retryCount; i > 0; i-- {
 			result, t, status, err = resolveNS(domain, nameServer)
 			timeout = status == "TIMEOUT"
-			if nil == err || !timeout {
+			retry = timeout || status == "NO_RESPONSE"
+			if nil == err || !retry {
 				break
 			}
 			logIt("Retrying", domain, "#", (retryCount-i)+1, " time")
