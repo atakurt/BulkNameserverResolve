@@ -28,7 +28,6 @@ type resolveResult struct {
 	domain      string
 	nameservers []string
 	err         string
-	timeout     bool
 	status      string
 }
 
@@ -89,17 +88,21 @@ func resolve(wg *sync.WaitGroup, id int, dnsQueue <-chan string, dnsResults chan
 		var result []string
 		var err error
 		var t time.Duration
-		var timeout = false
-		var retry = false
+		var isSuccess = false
 		var status string
-		for i := retryCount; i > 0; i-- {
-			result, t, status, err = resolveNS(domain, nameServer)
-			timeout = status == "TIMEOUT"
-			retry = timeout || status == "NO_RESPONSE"
-			if nil == err || !retry {
-				break
+
+		result, t, status, err = resolveNS(domain, nameServer)
+		isSuccess = status == "SUCCESS"
+
+		if !isSuccess {
+			for i := retryCount; i > 0; i-- {
+				result, t, status, err = resolveNS(domain, nameServer)
+				isSuccess = status == "SUCCESS"
+				if isSuccess {
+					break
+				}
+				logIt("worker", id, "retrying", domain, "#", (retryCount-i)+1, " time")
 			}
-			logIt("Retrying", domain, "#", (retryCount-i)+1, " time")
 		}
 
 		logIt("worker", id, "resolved", domain, "as", result, "in", t)
@@ -110,7 +113,7 @@ func resolve(wg *sync.WaitGroup, id int, dnsQueue <-chan string, dnsResults chan
 			errorMessage = err.Error()
 		}
 
-		dnsResults <- resolveResult{domain: domain, nameservers: result, err: errorMessage, timeout: timeout, status: status}
+		dnsResults <- resolveResult{domain: domain, nameservers: result, err: errorMessage, status: status}
 	}
 }
 
@@ -134,7 +137,7 @@ func resolveNS(domain string, nameServer string) (r []string, t time.Duration, s
 		}
 	}
 
-	if nil != response && len(response.Answer) == 0 {
+	if nil == response || (nil == err && len(response.Answer) == 0) {
 		status = "NO_RESPONSE"
 	}
 
@@ -156,7 +159,6 @@ func addDomainsToResolveQueue(dnsQueue chan<- string, fileName string) int {
 
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	var domainCount = 0
