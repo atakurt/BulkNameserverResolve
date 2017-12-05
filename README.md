@@ -3,7 +3,7 @@
 go get github.com/miekg/dns
 
 
-go build resolve.go
+go build -o resolve
 
 
 # usage
